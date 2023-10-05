@@ -4,3 +4,119 @@ author: "Teresa Moore"
 date: "2023-10-01"
 output: github_document
 ---
+```{r, echo=FALSE}
+library(tidyverse)
+library(dplyr)
+```
+
+
+## Problem 2
+```{r}
+mr_trash_wheel=
+  readxl::read_excel("data/202309 Trash Wheel Collection Data.xlsx", range="A2:N549") |>
+  mutate(trash_wheel = "mr") |>
+  janitor::clean_names() |>
+  drop_na() |>
+  mutate(homes_powered = (weight_tons * 500) / 30)
+  
+professor_trash_wheel = 
+  readxl::read_excel("data/professor trashwheel.xlsx", range = "A2:M96") |>
+  mutate(trash_wheel = "professor")|>
+  janitor::clean_names() |>
+  drop_na()|>
+  mutate(homes_powered = (weight_tons * 500) / 30)
+
+captain_trash_wheel = 
+  readxl::read_excel("data/captain trashwheel.xlsx", range = "A2:K27") |>
+  mutate(trash_wheel = "captain") |>
+  janitor::clean_names() |>
+  drop_na()|>
+  mutate(homes_powered = (weight_tons * 500) / 30)
+  
+gwynnda_trash_wheel = 
+  readxl::read_excel("data/gwynnda trashwheel.xlsx", range = "A2:K108") |>
+  mutate(trash_wheel = "gwynnda")|>
+  janitor::clean_names() |>
+  drop_na()|>
+  mutate(homes_powered = (weight_tons * 500) / 30)
+
+mr_trash_wheel$year <- as.character(mr_trash_wheel$year)
+professor_trash_wheel$year <- as.character(professor_trash_wheel$year)
+captain_trash_wheel$year <- as.character(captain_trash_wheel$year)
+gwynnda_trash_wheel$year <- as.character(gwynnda_trash_wheel$year)
+
+trash_wheels_combined_df= 
+  bind_rows(mr_trash_wheel, professor_trash_wheel, captain_trash_wheel, gwynnda_trash_wheel)
+
+cigarette_butts_july_2021_gwynnda=
+  filter(gwynnda_trash_wheel, month=="July", year=="2021")|>
+  select(month, year, cigarette_butts)
+```
+
+The number of observations in the resulting dataset, trash_wheels_combined, is `r nrow(trash_wheels_combined_df)`. Some key variables in the dataset are: the dumpster number, the month and year the trash was collected, the weight in tons, as well as the number of specific types of trash collected, such as glass bottles and grocery bags. The total weight collected by Professor Trash Wheel was `r sum(professor_trash_wheel$weight_tons)` tons.The total number of cigarette butts collected by Gwynnda in July of 2021 was `r sum(cigarette_butts_july_2021_gwynnda$cigarette_butts)` butts.
+
+# Problem 3
+```{r}
+mci_baseline=
+  read.csv("data_mci/MCI_baseline.csv")|>
+  janitor::clean_names() |>
+  mutate(
+    apoe4=
+      case_match(
+      apoe4,
+     1 ~ "carrier",
+     0 ~ "non-carrier"),
+    apoe4 = as.factor(apoe4)) |>
+  mutate(
+    sex=
+      case_match(
+      sex,
+     1 ~ "male",
+     0 ~ "female"),
+    sex = as.factor(sex))|>
+  rename(years_of_education=education)|>
+  rename(study_id=id)
+
+female_df =
+  filter(mci_baseline, sex=="female")|>
+  select(sex, apoe4)
+
+female_apoE4_carriers =
+  filter(female_df, apoe4 == "carrier")
+```
+
+Important steps in the import process included removing the top line that explained what each entry meant (i.e female=0, male=1). Removing this row from the table was okay because we changed the numeric entries to what they coded for. We also renamed the education column to years of education to be clear. In this dataset, we have the study id, current age in years, the sex (male or female), the years of education, and the apoe4 carrier status. 
+
+The amount of people who are recruited to the study (those who do not have MCI at the start) is `r nrow(mci_baseline)` people.
+
+The average baseline age is `r mean(mci_baseline$current_age)` years. 
+
+The proportion of women in the study who are APOE4 carriers is `r nrow (female_apoE4_carriers)/nrow(female_df)`.
+
+
+```{r}
+mci_amyloid=
+  read.csv("data_mci/mci_amyloid.csv") |>
+  janitor::clean_names() 
+
+mci_combined= 
+  left_join(mci_baseline, mci_amyloid, by = "study_id")
+
+common_participants =
+  left_join(mci_baseline, mci_amyloid, by = "study_id")
+
+unique_to_baseline <- anti_join(mci_baseline, mci_amyloid, by = "study_id")
+
+unique_to_amyloid <- anti_join(mci_amyloid,mci_baseline, by = "study_id")
+```
+
+It was important to remove the first line of the csv file, like with the mci_baseline csv. I also went back and changed the name of the variable "ID" in mci_baseline to match the name of the "study_id" variable, so the databases could be joined by study_id. That way we would only have the people who met the criteria for the study in the table. 
+
+There were `r nrow(common_participants)` in the baseline dataset that were also in the amyloid dataset. There are `r nrow(unique_to_baseline)` individuals who are unique to the baseline dataset, and `r nrow(unique_to_amyloid)` who are unique to the amyloid dataset.
+
+The combined dataset has the patient id, current age in years, the sex (male or female), the years of education, and the apoe4 carrier status, as well as the time (in years) elapsed since the study baseline to the visit where biomarker Amyloid _ 42/40 ratio was measured.
+
+```{r}
+write.csv(mci_combined,"data/mci_combined.csv")
+```
+
